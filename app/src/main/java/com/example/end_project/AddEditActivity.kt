@@ -1,6 +1,7 @@
 package com.example.end_project
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,16 +14,15 @@ class AddEditActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityAddEditBinding
     private lateinit var dbHelper: DBHelper
-    private var selectedPhotoUri: String? = null // 선택된 사진의 URI를 저장할 변수
 
-    // 갤러리에서 이미지를 선택해오는 런처(도구)
+    private var selectedPhotoUri: String? = null
+    private var recordId: Int = -1 // -1이면 '새로 추가', 0 이상이면 '기존 기록 수정' 모드
+
     private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
-            // 앱을 껐다 켜도 사진 권한을 유지하기 위한 설정
             contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-
             selectedPhotoUri = uri.toString()
-            binding.ivSelectedPhoto.setImageURI(uri) // 화면에 선택된 사진 보여주기
+            binding.ivSelectedPhoto.setImageURI(uri)
         }
     }
 
@@ -33,15 +33,32 @@ class AddEditActivity : AppCompatActivity() {
 
         dbHelper = DBHelper(this)
 
-        // 1. 사진 선택 버튼 클릭
+        // 전달받은 데이터가 있는지 확인 (수정 모드인지 판별)
+        checkEditMode()
+
         binding.btnSelectPhoto.setOnClickListener {
-            // 이미지 파일만 선택할 수 있도록 갤러리 열기
             pickImageLauncher.launch(arrayOf("image/*"))
         }
 
-        // 2. 저장하기 버튼 클릭
         binding.btnSave.setOnClickListener {
             saveRecord()
+        }
+    }
+
+    private fun checkEditMode() {
+        recordId = intent.getIntExtra("RECORD_ID", -1)
+
+        if (recordId != -1) { // 수정 모드일 때 기존 데이터 채워넣기
+            binding.etPlace.setText(intent.getStringExtra("PLACE"))
+            binding.etDate.setText(intent.getStringExtra("DATE"))
+            binding.etMemo.setText(intent.getStringExtra("MEMO"))
+
+            val uriStr = intent.getStringExtra("PHOTO_URI")
+            if (!uriStr.isNullOrEmpty()) {
+                selectedPhotoUri = uriStr
+                binding.ivSelectedPhoto.setImageURI(Uri.parse(uriStr))
+            }
+            binding.btnSave.text = "수정 완료하기"
         }
     }
 
@@ -50,28 +67,25 @@ class AddEditActivity : AppCompatActivity() {
         val date = binding.etDate.text.toString().trim()
         val memo = binding.etMemo.text.toString().trim()
 
-        // 입력값 검사 (빈칸 방지)
         if (place.isEmpty() || date.isEmpty()) {
             Toast.makeText(this, "여행지와 날짜를 입력해주세요.", Toast.LENGTH_SHORT).show()
             return
         }
 
-        // DB에 넣을 데이터 객체 생성
-        val newRecord = TravelRecord(
-            place = place,
-            visitDate = date,
-            memo = memo,
-            photoUri = selectedPhotoUri
-        )
-
-        // DB에 데이터 삽입 (3단계에서 만든 DBHelper 사용!)
-        val result = dbHelper.insertRecord(newRecord)
-
-        if (result != -1L) {
-            Toast.makeText(this, "저장되었습니다!", Toast.LENGTH_SHORT).show()
-            finish() // 액티비티 종료 (목록 화면으로 돌아감)
+        if (recordId == -1) {
+            // [Create] 새 데이터 추가
+            val newRecord = TravelRecord(place = place, visitDate = date, memo = memo, photoUri = selectedPhotoUri)
+            if (dbHelper.insertRecord(newRecord) != -1L) {
+                Toast.makeText(this, "저장되었습니다!", Toast.LENGTH_SHORT).show()
+                finish()
+            }
         } else {
-            Toast.makeText(this, "저장에 실패했습니다.", Toast.LENGTH_SHORT).show()
+            // [Update] 기존 데이터 수정
+            val updatedRecord = TravelRecord(no = recordId, place = place, visitDate = date, memo = memo, photoUri = selectedPhotoUri)
+            if (dbHelper.updateRecord(updatedRecord) > 0) {
+                Toast.makeText(this, "수정되었습니다!", Toast.LENGTH_SHORT).show()
+                finish()
+            }
         }
     }
 }

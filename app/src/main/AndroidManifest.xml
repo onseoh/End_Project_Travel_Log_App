@@ -12,6 +12,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.End_Project">
         <activity
+            android:name=".DetailActivity"
+            android:exported="false" />
+        <activity
             android:name=".AddEditActivity"
             android:exported="false" />
         <activity
