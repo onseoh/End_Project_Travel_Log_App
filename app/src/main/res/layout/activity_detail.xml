@@ -7,7 +7,7 @@
     android:paddingEnd="24dp"
     android:paddingBottom="24dp"
     android:paddingTop="90dp"
-    android:background="#FFFFFF">
+    android:backgroundTint="@color/item_background">
 
     <ImageView
         android:id="@+id/iv_detail_photo"
@@ -24,7 +24,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="24dp"
-        android:textColor="#000000"
+        android:textColor="@color/text_color"
         android:textSize="28sp"
         android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
@@ -55,7 +55,7 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginTop="16dp"
-        android:textColor="#333333"
+        android:textColor="@color/text_color"
         android:textSize="18sp"
         android:lineSpacingExtra="6dp"
         app:layout_constraintBottom_toBottomOf="parent"

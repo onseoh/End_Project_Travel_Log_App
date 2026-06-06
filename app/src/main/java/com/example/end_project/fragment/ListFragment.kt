@@ -11,6 +11,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.PopupMenu
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
@@ -64,11 +65,9 @@ class ListFragment : Fragment() {
     private fun setupRecyclerView() {
         adapter = TravelListAdapter(emptyList(),
             onItemClick = { record ->
-                // [수정됨] 짧게 누르면 상세 보기 화면으로 이동!
                 moveToDetailActivity(record)
             },
             onItemLongClick = { record, anchorView ->
-                // 길게 누르면 여전히 팝업 메뉴 등장
                 showContextMenu(record, anchorView)
             }
         )
@@ -77,17 +76,14 @@ class ListFragment : Fragment() {
     }
 
     private fun loadData() {
-        // 1. 코루틴 시작 (로딩 바 보이기)
         binding.progressBar.visibility = View.VISIBLE
         binding.recyclerView.visibility = View.GONE
 
         lifecycleScope.launch {
-            // 2. 백그라운드 스레드(IO)에서 무거운 DB 작업 수행
             val records = withContext(Dispatchers.IO) {
                 dbHelper.getAllRecords()
             }
 
-            // 3. 메인 스레드로 돌아와서 UI 업데이트 및 로딩 바 숨기기
             adapter.updateData(records)
             binding.progressBar.visibility = View.GONE
             binding.recyclerView.visibility = View.VISIBLE
@@ -100,7 +96,7 @@ class ListFragment : Fragment() {
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 R.id.menu_edit -> {
-                    moveToEditActivity(record) // 수정은 AddEditActivity 로!
+                    moveToEditActivity(record)
                     true
                 }
                 R.id.menu_delete -> {
@@ -126,7 +122,6 @@ class ListFragment : Fragment() {
             .show()
     }
 
-    // [추가됨] 상세 보기 화면으로 이동하는 함수
     private fun moveToDetailActivity(record: TravelRecord) {
         val intent = Intent(requireContext(), DetailActivity::class.java).apply {
             putExtra("PLACE", record.place)
@@ -137,7 +132,6 @@ class ListFragment : Fragment() {
         startActivity(intent)
     }
 
-    // 기존의 수정 화면으로 이동하는 함수 (컨텍스트 메뉴에서 호출)
     private fun moveToEditActivity(record: TravelRecord) {
         val intent = Intent(requireContext(), AddEditActivity::class.java).apply {
             putExtra("RECORD_ID", record.no)
@@ -170,10 +164,28 @@ class ListFragment : Fragment() {
                             .show()
                         true
                     }
+                    R.id.menu_theme -> {
+                        showThemeDialog()
+                        true
+                    }
                     else -> false
                 }
             }
         }, viewLifecycleOwner, Lifecycle.State.RESUMED)
+    }
+
+    private fun showThemeDialog() {
+        val themeArray = arrayOf("라이트 모드", "다크 모드", "시스템 기본값")
+        AlertDialog.Builder(requireContext())
+            .setTitle("테마 선택")
+            .setItems(themeArray) { _, which ->
+                when (which) {
+                    0 -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+                    1 -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+                    2 -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+                }
+            }
+            .show()
     }
 
     override fun onDestroyView() {
