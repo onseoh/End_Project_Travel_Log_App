@@ -3,21 +3,30 @@ package com.example.end_project.fragment
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
-import android.view.*
+import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
+import android.view.View
+import android.view.ViewGroup
 import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.end_project.AddEditActivity
-import com.example.end_project.DetailActivity // DetailActivity 임포트 추가
+import com.example.end_project.DetailActivity
 import com.example.end_project.R
 import com.example.end_project.adapter.TravelListAdapter
 import com.example.end_project.databinding.FragmentListBinding
 import com.example.end_project.db.DBHelper
 import com.example.end_project.model.TravelRecord
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class ListFragment : Fragment() {
     private var _binding: FragmentListBinding? = null
@@ -68,8 +77,21 @@ class ListFragment : Fragment() {
     }
 
     private fun loadData() {
-        val records = dbHelper.getAllRecords()
-        adapter.updateData(records)
+        // 1. 코루틴 시작 (로딩 바 보이기)
+        binding.progressBar.visibility = View.VISIBLE
+        binding.recyclerView.visibility = View.GONE
+
+        lifecycleScope.launch {
+            // 2. 백그라운드 스레드(IO)에서 무거운 DB 작업 수행
+            val records = withContext(Dispatchers.IO) {
+                dbHelper.getAllRecords()
+            }
+
+            // 3. 메인 스레드로 돌아와서 UI 업데이트 및 로딩 바 숨기기
+            adapter.updateData(records)
+            binding.progressBar.visibility = View.GONE
+            binding.recyclerView.visibility = View.VISIBLE
+        }
     }
 
     private fun showContextMenu(record: TravelRecord, view: View) {
