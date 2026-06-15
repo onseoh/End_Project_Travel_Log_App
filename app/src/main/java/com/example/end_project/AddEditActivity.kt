@@ -84,7 +84,9 @@ class AddEditActivity : AppCompatActivity() {
             "${packageName}.provider",
             photoFile
         )
-        takePictureLauncher.launch(cameraImageUri)
+        cameraImageUri?.let { uri ->
+            takePictureLauncher.launch(uri)
+        } // 👈 여기에 누락되었던 닫는 괄호(})를 추가했습니다.
     }
 
     private fun checkEditMode() {
