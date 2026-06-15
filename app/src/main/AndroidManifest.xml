@@ -21,6 +21,17 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="${mapsApiKey}" />
 
+        <!-- 카메라 촬영 시 file:// Uri 대신 content:// Uri를 제공 (FileUriExposedException 방지) -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <activity
             android:name=".DetailActivity"
             android:exported="false" />

@@ -3,13 +3,13 @@ package com.example.end_project.fragment
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
+import android.view.ContextMenu
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.MenuHost
@@ -63,16 +63,45 @@ class ListFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
+        // onItemLongClick 람다 제거 — registerForContextMenu 방식으로 교체
         adapter = TravelListAdapter(emptyList(),
-            onItemClick = { record ->
-                moveToDetailActivity(record)
-            },
-            onItemLongClick = { record, anchorView ->
-                showContextMenu(record, anchorView)
-            }
+            onItemClick = { record -> moveToDetailActivity(record) }
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
+
+        // 지침: "컨텍스트 메뉴 구현 (항목 길게 누르기)"
+        // registerForContextMenu: 해당 View를 Context Menu 트리거로 등록
+        registerForContextMenu(binding.recyclerView)
+    }
+
+    // 지침 필수 구현: 컨텍스트 메뉴 생성
+    // RecyclerView 항목을 길게 누르면 시스템이 자동으로 호출
+    override fun onCreateContextMenu(
+        menu: ContextMenu,
+        v: View,
+        menuInfo: ContextMenu.ContextMenuInfo?
+    ) {
+        super.onCreateContextMenu(menu, v, menuInfo)
+        requireActivity().menuInflater.inflate(R.menu.context_menu, menu)
+        menu.setHeaderTitle("작업 선택")
+    }
+
+    // 지침 필수 구현: 컨텍스트 메뉴 항목 선택 처리
+    override fun onContextItemSelected(item: MenuItem): Boolean {
+        val record = adapter.getLongClickedRecord() ?: return false
+        return when (item.itemId) {
+            R.id.menu_edit -> {
+                moveToEditActivity(record)
+                true
+            }
+            R.id.menu_delete -> {
+                // 지침: "컨텍스트 메뉴는 AlertDialog를 반드시 거쳐야 한다"
+                showDeleteConfirmDialog(record)
+                true
+            }
+            else -> super.onContextItemSelected(item)
+        }
     }
 
     private fun loadData() {
@@ -83,30 +112,10 @@ class ListFragment : Fragment() {
             val records = withContext(Dispatchers.IO) {
                 dbHelper.getAllRecords()
             }
-
             adapter.updateData(records)
             binding.progressBar.visibility = View.GONE
             binding.recyclerView.visibility = View.VISIBLE
         }
-    }
-
-    private fun showContextMenu(record: TravelRecord, view: View) {
-        val popup = PopupMenu(requireContext(), view)
-        popup.menuInflater.inflate(R.menu.context_menu, popup.menu)
-        popup.setOnMenuItemClickListener { item ->
-            when (item.itemId) {
-                R.id.menu_edit -> {
-                    moveToEditActivity(record)
-                    true
-                }
-                R.id.menu_delete -> {
-                    showDeleteConfirmDialog(record)
-                    true
-                }
-                else -> false
-            }
-        }
-        popup.show()
     }
 
     private fun showDeleteConfirmDialog(record: TravelRecord) {

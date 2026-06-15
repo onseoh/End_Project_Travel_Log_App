@@ -1,14 +1,20 @@
 package com.example.end_project
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
 import com.example.end_project.databinding.ActivityAddEditBinding
 import com.example.end_project.db.DBHelper
 import com.example.end_project.model.TravelRecord
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class AddEditActivity : AppCompatActivity() {
 
@@ -16,15 +22,31 @@ class AddEditActivity : AppCompatActivity() {
     private lateinit var dbHelper: DBHelper
 
     private var selectedPhotoUri: String? = null
-    private var recordId: Int = -1 // -1이면 '새로 추가', 0 이상이면 '기존 기록 수정' 모드
+    private var recordId: Int = -1
 
-    private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            selectedPhotoUri = uri.toString()
-            binding.ivSelectedPhoto.setImageURI(uri)
+    // 카메라 촬영 시 임시 저장할 Uri (FileProvider 경유)
+    private var cameraImageUri: Uri? = null
+
+    // 갤러리 선택 런처
+    private val pickImageLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                contentResolver.takePersistableUriPermission(
+                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                selectedPhotoUri = uri.toString()
+                binding.ivSelectedPhoto.setImageURI(uri)
+            }
         }
-    }
+
+    // 지침: "카메라/갤러리 선택" 필수 구현 — 카메라 촬영 런처 추가
+    private val takePictureLauncher =
+        registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+            if (success && cameraImageUri != null) {
+                selectedPhotoUri = cameraImageUri.toString()
+                binding.ivSelectedPhoto.setImageURI(cameraImageUri)
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,12 +54,19 @@ class AddEditActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         dbHelper = DBHelper(this)
-
-        // 전달받은 데이터가 있는지 확인 (수정 모드인지 판별)
         checkEditMode()
 
+        // 사진 선택 버튼: 카메라 / 갤러리 선택 다이얼로그
         binding.btnSelectPhoto.setOnClickListener {
-            pickImageLauncher.launch(arrayOf("image/*"))
+            AlertDialog.Builder(this)
+                .setTitle("사진 선택")
+                .setItems(arrayOf("카메라로 촬영", "갤러리에서 선택")) { _, which ->
+                    when (which) {
+                        0 -> launchCamera()
+                        1 -> pickImageLauncher.launch(arrayOf("image/*"))
+                    }
+                }
+                .show()
         }
 
         binding.btnSave.setOnClickListener {
@@ -45,10 +74,23 @@ class AddEditActivity : AppCompatActivity() {
         }
     }
 
+    // FileProvider를 통해 카메라 앱에 임시 파일 Uri를 전달
+    // 직접 file:// Uri를 넘기면 FileUriExposedException 발생 → FileProvider 필수
+    private fun launchCamera() {
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val photoFile = File.createTempFile("PHOTO_${timeStamp}_", ".jpg", cacheDir)
+        cameraImageUri = FileProvider.getUriForFile(
+            this,
+            "${packageName}.provider",
+            photoFile
+        )
+        takePictureLauncher.launch(cameraImageUri)
+    }
+
     private fun checkEditMode() {
         recordId = intent.getIntExtra("RECORD_ID", -1)
 
-        if (recordId != -1) { // 수정 모드일 때 기존 데이터 채워넣기
+        if (recordId != -1) {
             binding.etPlace.setText(intent.getStringExtra("PLACE"))
             binding.etDate.setText(intent.getStringExtra("DATE"))
             binding.etMemo.setText(intent.getStringExtra("MEMO"))
@@ -73,15 +115,17 @@ class AddEditActivity : AppCompatActivity() {
         }
 
         if (recordId == -1) {
-            // [Create] 새 데이터 추가
-            val newRecord = TravelRecord(place = place, visitDate = date, memo = memo, photoUri = selectedPhotoUri)
+            val newRecord = TravelRecord(
+                place = place, visitDate = date, memo = memo, photoUri = selectedPhotoUri
+            )
             if (dbHelper.insertRecord(newRecord) != -1L) {
                 Toast.makeText(this, "저장되었습니다!", Toast.LENGTH_SHORT).show()
                 finish()
             }
         } else {
-            // [Update] 기존 데이터 수정
-            val updatedRecord = TravelRecord(no = recordId, place = place, visitDate = date, memo = memo, photoUri = selectedPhotoUri)
+            val updatedRecord = TravelRecord(
+                no = recordId, place = place, visitDate = date, memo = memo, photoUri = selectedPhotoUri
+            )
             if (dbHelper.updateRecord(updatedRecord) > 0) {
                 Toast.makeText(this, "수정되었습니다!", Toast.LENGTH_SHORT).show()
                 finish()

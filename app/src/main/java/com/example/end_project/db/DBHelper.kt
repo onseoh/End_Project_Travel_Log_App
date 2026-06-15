@@ -2,7 +2,6 @@ package com.example.end_project.db
 
 import android.content.ContentValues
 import android.content.Context
-import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.example.end_project.model.TravelRecord
@@ -52,37 +51,31 @@ class DBHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
             put(COLUMN_MEMO, record.memo)
             put(COLUMN_PHOTO_URI, record.photoUri)
         }
-        val result = db.insert(TABLE_NAME, null, values)
-        db.close()
-        return result // 성공 시 행의 ID, 실패 시 -1 반환
+        // db.close() 제거: SQLiteOpenHelper가 커넥션을 내부적으로 관리하므로
+        // 매번 close()하면 동시 접근 시 "already-closed" 오류 발생
+        return db.insert(TABLE_NAME, null, values)
     }
 
-    // [Read] 모든 여행 기록 최신순으로 조회 (RecyclerView 목록 표시용)
+    // [Read] 모든 여행 기록 방문 날짜 최신순으로 조회 (RecyclerView 목록 표시용)
+    // 지침: "기록은 날짜를 기준으로 정렬" → ORDER BY visit_date DESC
     fun getAllRecords(): List<TravelRecord> {
         val recordList = ArrayList<TravelRecord>()
-        val selectQuery = "SELECT * FROM $TABLE_NAME ORDER BY `$COLUMN_NO` DESC"
+        val selectQuery = "SELECT * FROM $TABLE_NAME ORDER BY $COLUMN_VISIT_DATE DESC"
         val db = this.readableDatabase
-        var cursor: Cursor? = null
 
-        try {
-            cursor = db.rawQuery(selectQuery, null)
-            if (cursor.moveToFirst()) {
-                do {
-                    val record = TravelRecord(
+        // use{} 블록: cursor를 항상 자동으로 close() → 누수 방지
+        db.rawQuery(selectQuery, null).use { cursor ->
+            while (cursor.moveToNext()) {
+                recordList.add(
+                    TravelRecord(
                         no = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_NO)),
                         place = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_PLACE)),
                         visitDate = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_VISIT_DATE)),
                         memo = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_MEMO)),
                         photoUri = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_PHOTO_URI))
                     )
-                    recordList.add(record)
-                } while (cursor.moveToNext())
+                )
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        } finally {
-            cursor?.close()
-            db.close()
         }
         return recordList
     }
@@ -96,17 +89,14 @@ class DBHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null
             put(COLUMN_MEMO, record.memo)
             put(COLUMN_PHOTO_URI, record.photoUri)
         }
-        // 고유 번호(no)가 일치하는 데이터를 찾아서 업데이트
-        val result = db.update(TABLE_NAME, values, "$COLUMN_NO=?", arrayOf(record.no.toString()))
-        db.close()
-        return result // 업데이트된 행의 개수 반환
+        // db.close() 제거
+        return db.update(TABLE_NAME, values, "$COLUMN_NO=?", arrayOf(record.no.toString()))
     }
 
     // [Delete] 여행 기록 삭제
     fun deleteRecord(no: Int): Int {
         val db = this.writableDatabase
-        val result = db.delete(TABLE_NAME, "$COLUMN_NO=?", arrayOf(no.toString()))
-        db.close()
-        return result // 삭제된 행의 개수 반환
+        // db.close() 제거
+        return db.delete(TABLE_NAME, "$COLUMN_NO=?", arrayOf(no.toString()))
     }
 }
